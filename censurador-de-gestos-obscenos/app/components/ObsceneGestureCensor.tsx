@@ -10,36 +10,36 @@ export default function ObsceneGestureCensor() {
   const [loading, setLoading] = useState(true);
   const [detectedGesture, setDetectedGesture] = useState<string | null>(null);
 
-  // Threshold for finger extension detection
+  
   const EXTENSION_THRESHOLD = 0.02;
 
-  // Helper to check if a finger is extended (pointing up)
+  
   const isFingerExtended = (tip: NormalizedLandmark, pip: NormalizedLandmark) => {
     return tip.y < pip.y - EXTENSION_THRESHOLD;
   };
 
-  // Helper to check if thumb is pointing down
+  
   const isThumbDown = (tip: NormalizedLandmark, ip: NormalizedLandmark) => {
-    // y increases downwards, so tip.y > ip.y means pointing down
+    
     return tip.y > ip.y + EXTENSION_THRESHOLD;
   };
 
-  // Helper to calculate distance between two landmarks
+  
   const getDistance = (p1: NormalizedLandmark, p2: NormalizedLandmark) => {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y);
   };
 
-  // Helper to check if a finger is open (extended) based on distance ratio
-  // If distance(TIP, MCP) is large compared to distance(PIP, MCP), it's open.
+  
+  
   const isFingerOpen = (tip: NormalizedLandmark, pip: NormalizedLandmark, mcp: NormalizedLandmark) => {
     const distTipMCP = getDistance(tip, mcp);
     const distPIPMCP = getDistance(pip, mcp);
-    // Tip should be significantly further from MCP than PIP is.
-    // A ratio of > 1.6 usually indicates extension.
+    
+    
     return distTipMCP > distPIPMCP * 1.6;
   };
 
-  // Detect gesture type
+  
   const detectGesture = (landmarks: NormalizedLandmark[]): string | null => {
     const thumbTip = landmarks[4];
     const thumbIP = landmarks[3];
@@ -61,57 +61,54 @@ export default function ObsceneGestureCensor() {
     const pinkyPIP = landmarks[18];
     const pinkyMCP = landmarks[17];
 
-    // Check openness of fingers
+    
     const indexOpen = isFingerOpen(indexTip, indexPIP, indexMCP);
     const middleOpen = isFingerOpen(middleTip, middlePIP, middleMCP);
     const ringOpen = isFingerOpen(ringTip, ringPIP, ringMCP);
     const pinkyOpen = isFingerOpen(pinkyTip, pinkyPIP, pinkyMCP);
 
-    // Thumb is special. Check if it's extended away from palm/index.
-    // Simple check: Thumb tip is far from Index MCP
+    
+    
     const thumbOpen = getDistance(thumbTip, indexMCP) > 0.15;
     
-    // Directional checks (still useful for orientation)
-    const isThumbUp = thumbTip.y < thumbIP.y; // y decreases upwards
+    
+    const isThumbUp = thumbTip.y < thumbIP.y; 
     const isThumbDown = thumbTip.y > thumbIP.y;
 
-    // 1. Middle Finger (Dedo do meio)
-    // Middle open, others closed
+    // 1. Dedo do meio
+    
     if (middleOpen && !indexOpen && !ringOpen && !pinkyOpen) {
       return "MIDDLE_FINGER";
     }
 
-    // 2. OK Gesture
-    // Index and Thumb tips close, others open
+    // 2. OK 
+    
     const pinchDistance = getDistance(thumbTip, indexTip);
     if (pinchDistance < 0.08 && middleOpen && ringOpen && pinkyOpen) {
       return "OK";
     }
 
-    // 3. Gun Gesture (Arma)
-    // Thumb Open/Up, Index Open, others Closed
+    // 3. Arma
+    
     if (thumbOpen && indexOpen && !middleOpen && !ringOpen && !pinkyOpen) {
-        // Additional check: Thumb should be roughly up
+        
         if (isThumbUp) return "GUN";
     }
 
-    // 4. Thumbs Down (Dislike)
-    // All fingers closed, Thumb Open & Down
+    // 4. Negativo
+    
     if (!indexOpen && !middleOpen && !ringOpen && !pinkyOpen) {
        if (thumbOpen && isThumbDown) {
          return "THUMBS_DOWN";
        }
     }
     
-    // 5. Thumbs Up (Joia) - Not censored, but logic helps differentiate
-    // All fingers closed, Thumb Open & Up
-    // This block is implicitly handled because it won't match GUN (index is closed)
-    // and won't match others.
+    
 
     return null;
   };
 
-  // Calculate bounding box for the hand
+  
   const getHandBoundingBox = (landmarks: NormalizedLandmark[], width: number, height: number) => {
     let minX = 1, minY = 1, maxX = 0, maxY = 0;
 
@@ -122,7 +119,7 @@ export default function ObsceneGestureCensor() {
       if (p.y > maxY) maxY = p.y;
     });
 
-    // Add some padding
+  
     const padding = 0.05;
     minX = Math.max(0, minX - padding);
     minY = Math.max(0, minY - padding);
@@ -155,7 +152,7 @@ export default function ObsceneGestureCensor() {
       }
 
       try {
-        // 1. Setup MediaPipe Hands
+        
         hands = new Hands({
           locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -172,7 +169,7 @@ export default function ObsceneGestureCensor() {
         hands.onResults((results: Results) => {
           if (!isMounted) return;
           
-          // Clear canvas
+          
           ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
           let currentGesture: string | null = null;
@@ -185,13 +182,13 @@ export default function ObsceneGestureCensor() {
             if (gesture) {
               const box = getHandBoundingBox(landmarks, canvasElement.width, canvasElement.height);
               
-              // 1. Apply Blur Effect
+              
               ctx.save();
               ctx.beginPath();
               ctx.rect(box.x, box.y, box.w, box.h);
               ctx.clip();
               ctx.filter = "blur(30px)";
-              // Draw the current video frame into the clipped region to create the blur
+              
               ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
               ctx.restore();
             }
@@ -200,11 +197,11 @@ export default function ObsceneGestureCensor() {
           setLoading(false);
         });
 
-        // 2. Setup Camera manually
+        
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         videoElement.srcObject = stream;
         
-        // Wait for video to be ready
+        
         await new Promise<void>((resolve) => {
           videoElement.onloadedmetadata = () => {
             resolve();
@@ -213,11 +210,11 @@ export default function ObsceneGestureCensor() {
         
         await videoElement.play();
 
-        // 3. Start processing loop
+        
         const processFrame = async () => {
           if (!isMounted) return;
           
-          if (hands && videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
+          if (hands && videoElement.readyState >= 2) { 
             await hands.send({ image: videoElement });
           }
           
@@ -252,7 +249,7 @@ export default function ObsceneGestureCensor() {
     };
   }, []);
 
-  // Handle resize to match canvas to video
+  
   useEffect(() => {
     const handleResize = () => {
       if (videoRef.current && canvasRef.current) {
@@ -282,7 +279,7 @@ export default function ObsceneGestureCensor() {
       justifyContent: "center", 
       alignItems: "center", 
       minHeight: "100vh", 
-      backgroundColor: "#121212", // Darker, more modern background
+      backgroundColor: "#121212", 
       padding: "20px",
       fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
     }}>
@@ -305,12 +302,12 @@ export default function ObsceneGestureCensor() {
         position: "relative", 
         width: "100%", 
         maxWidth: "800px", 
-        borderRadius: "24px", // More rounded corners
+        borderRadius: "24px", 
         overflow: "hidden",
-        boxShadow: "0 20px 50px rgba(0,0,0,0.6)", // Deeper shadow
+        boxShadow: "0 20px 50px rgba(0,0,0,0.6)", 
         backgroundColor: "#000",
         lineHeight: 0,
-        border: "1px solid rgba(255,255,255,0.1)" // Subtle border
+        border: "1px solid rgba(255,255,255,0.1)" 
       }}>
         {loading && (
           <div style={{ 
@@ -348,13 +345,13 @@ export default function ObsceneGestureCensor() {
 
         <video
           ref={videoRef}
-          style={{ display: "block", width: "100%", height: "auto", transform: "scaleX(-1)" }} // Mirror effect for better UX
+          style={{ display: "block", width: "100%", height: "auto", transform: "scaleX(-1)" }} 
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
-          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", transform: "scaleX(-1)" }} // Mirror canvas too
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", transform: "scaleX(-1)" }} 
         />
       </div>
 
